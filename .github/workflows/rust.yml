@@ -1,0 +1,62 @@
+name: Setup SFML for rust-sfml
+
+on:
+    push:
+      branches: [ "master" ]
+    pull_request:
+      branches: [ "master" ]
+env:
+  CARGO_TERM_COLOR: always
+  SFML_INCLUDE_DIR: C:/SFML/include
+  SFML_LIBS_DIR: C:/SFML/lib
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download and extract SFML
+        run: |
+          mkdir C:/SFML
+          curl -L https://www.sfml-dev.org/files/SFML-2.5.1-windows-vc15-64-bit.zip -o sfml.zip
+          tar -xf sfml.zip -C C:/SFML --strip-components=1
+          rm sfml.zip
+
+      - name: Set up environment variables
+        run: |
+          echo "SFML_INCLUDE_DIR=C:/SFML/include" >> $GITHUB_ENV
+          echo "SFML_LIBS_DIR=C:/SFML/lib" >> $GITHUB_ENV
+
+      - name: Print environment variables
+        run: |
+          echo "SFML_INCLUDE_DIR is ${{ env.SFML_INCLUDE_DIR }}"
+          echo "SFML_LIBS_DIR is ${{ env.SFML_LIBS_DIR }}"
+
+      - name: Close and reopen cmd prompt
+        run: |
+          echo "Closing and reopening cmd prompt..."
+          cmd /c exit
+
+      - name: Verify environment variables
+        run: |
+          echo "SFML_INCLUDE_DIR is ${{ env.SFML_INCLUDE_DIR }}"
+          echo "SFML_LIBS_DIR is ${{ env.SFML_LIBS_DIR }}"
+
+      - name: Build for Windows
+        run: |
+          cargo build --release --verbose
+
+      - name: Package artifacts
+        run: |
+          mkdir artifacts
+          dir target
+          dir target/release
+          cp target/release/client.exe artifacts/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: bin
+          path: artifacts/client.exe
