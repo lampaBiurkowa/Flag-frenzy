@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
-use tokio::{net::tcp::OwnedWriteHalf, sync::Mutex};
-
+use std::{sync::Arc, time};
+use tokio::{net::tcp::OwnedWriteHalf, sync::Mutex, time::Instant};
 use rand::Rng;
 
 use crate::shared::*;
@@ -11,14 +9,18 @@ pub struct Bot {
     player_id: u32,
     target_x: f32,
     target_y: f32,
+    last_shot_time: Instant
 }
 
 impl Bot {
+    const SHOOT_FREQ_MILLIS: u64 = 400;
+
     pub fn new(player_id: u32) -> Self {
         Bot {
             player_id: player_id,
             target_x: rand::thread_rng().gen_range(0.0..WINDOW_SIZE_X as f32),
             target_y: rand::thread_rng().gen_range(0.0..WINDOW_SIZE_Y as f32),
+            last_shot_time: Instant::now()
         }
     }
 
@@ -33,10 +35,6 @@ impl Bot {
         };
 
         send_command(&mut *writer.lock().await, CMD_PLAYER, &player).await;
-        // {
-        //     let mut game_state = game_state.lock().await;
-        //     game_state.players.push(player);
-        // }
         loop {
             let is_present;
             {
@@ -71,19 +69,24 @@ impl Bot {
             processed_player = player.clone();
         }
 
+        if !self.can_shoot() {
+            return processed_player;
+        }
+
+        for box_item in &game_state_clone.boxes {
+            let distance = get_distance(processed_player.x, box_item.x, processed_player.y, box_item.y);
+            if distance < 50.0 {
+                let (dx, dy) = normalize((box_item.x - processed_player.x, box_item.y - processed_player.y));
+                self.shoot(&processed_player, dx, dy, writer).await;
+            }
+        }
+
         for p in &game_state_clone.players {
             if p.id != processed_player.id {
                 let distance = get_distance(processed_player.x, p.x, processed_player.y, p.y);
                 if distance < 200.0 {
                     let (dx, dy) = normalize((p.x - processed_player.x, p.y - processed_player.y));
-                    let bullet = Bullet {
-                        x: processed_player.x,
-                        y: processed_player.y,
-                        dx,
-                        dy,
-                        owner_id: processed_player.id,
-                    };
-                    send_command(&mut *writer.lock().await, CMD_BULLET, &bullet).await;
+                    self.shoot(&processed_player, dx, dy, writer).await;
                 }
             }
         }
@@ -100,5 +103,23 @@ impl Bot {
             self.target_x = rand::thread_rng().gen_range(0.0..WINDOW_SIZE_X as f32);
             self.target_y = rand::thread_rng().gen_range(0.0..WINDOW_SIZE_Y as f32);
         }
+    }
+
+    async fn shoot(&mut self, player: &Player, dx: f32, dy: f32, writer: &Arc<Mutex<OwnedWriteHalf>>) {
+        let bullet = Bullet {
+            x: player.x,
+            y: player.y,
+            dx,
+            dy,
+            owner_id: player.id,
+        };
+        if self.can_shoot() {
+            send_command(&mut *writer.lock().await, CMD_BULLET, &bullet).await;
+            self.last_shot_time = Instant::now();
+        }
+    }
+
+    fn can_shoot(&mut self) -> bool {
+        Instant::now() - self.last_shot_time > time::Duration::from_millis(Bot::SHOOT_FREQ_MILLIS)
     }
 }

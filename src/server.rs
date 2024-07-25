@@ -1,8 +1,9 @@
-use shared::{get_distance, Bullet, CMD_BULLET, CMD_PLAYER, CMD_SEPARATOR, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
+use rand::Rng;
+use shared::{get_distance, Bullet, WoodBox, BOX_SIZE, CMD_BULLET, CMD_PLAYER, CMD_SEPARATOR, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::time;
+use tokio::time::{self, Instant};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -28,8 +29,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         flag_x: 400.0,
         flag_y: 300.0,
         flag_owner_id: Default::default(),
-        bullets: vec![]
+        bullets: vec![],
+        boxes: vec![],
     }));
+    initialize_boxes(&game_state).await;
+
+
     let clients = Arc::new(Mutex::new(HashMap::<u32, OwnedWriteHalf>::new()));
     tokio::spawn(send_data(Arc::clone(&clients), Arc::clone(&game_state)));
 
@@ -59,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn send_data(clients: Arc::<Mutex::<HashMap::<u32, OwnedWriteHalf>>>, game_state: Arc::<Mutex::<GameState>>)
 {
-    let mut captured_flag_timer = time::Instant::now();
+    let mut captured_flag_timer = Instant::now();
     loop {
         let game_state_serialized;
         {
@@ -67,9 +72,16 @@ async fn send_data(clients: Arc::<Mutex::<HashMap::<u32, OwnedWriteHalf>>>, game
             let game_state_clone = game_state.clone();
             game_state_serialized = serde_json::to_string(&game_state_clone).unwrap();
 
-            for bullet in &mut game_state.bullets {
-                bullet.x += bullet.dx * 20.0;
-                bullet.y += bullet.dy * 20.0;
+            let bullet_count = game_state_clone.bullets.len();
+            for i in 0..bullet_count {
+                game_state.bullets[i].mov();
+
+                let hit_box = game_state.boxes.iter().position(|b| get_distance(b.x, game_state_clone.bullets[i].x, b.y, game_state_clone.bullets[i].y) < BOX_SIZE);
+                if let Some(index) = hit_box {
+                    let (new_x, new_y) = find_free_spot(&game_state_clone);
+                    game_state.boxes[index] = WoodBox { x: new_x, y: new_y };
+                    game_state.bullets.retain(|b| b.x != game_state_clone.bullets[i].x && b.y != game_state_clone.bullets[i].y);
+                }
             }
 
             if let Some(player) = game_state_clone.players.iter().find(|p| get_distance(p.x, game_state_clone.flag_x, p.y, game_state_clone.flag_y) < 10.0) {
@@ -77,13 +89,13 @@ async fn send_data(clients: Arc::<Mutex::<HashMap::<u32, OwnedWriteHalf>>>, game
                 game_state.flag_x = player.x;
                 game_state.flag_y = player.y;
                 if !player.has_flag {
-                    captured_flag_timer = time::Instant::now();
+                    captured_flag_timer = Instant::now();
                     game_state.players.iter_mut().find(|p| p.id == player.id).unwrap().has_flag = true;
                 }
             }
 
-            if time::Instant::now() - captured_flag_timer > time::Duration::from_secs(1) {
-                captured_flag_timer = time::Instant::now();
+            if Instant::now() - captured_flag_timer > time::Duration::from_secs(1) {
+                captured_flag_timer = Instant::now();
                 if let Some(player) = game_state.players.iter_mut().find(|p| p.has_flag) {
                     player.score += 1;
                 }
@@ -218,4 +230,34 @@ async fn handle_bullet_cmd(buffer: &[u8], n: usize, read_game_state: Arc::<Mutex
         let mut game_state = read_game_state.lock().await;
         game_state.bullets.push(bullet);
     }
+}
+
+async fn initialize_boxes(game_state: &Arc<Mutex<GameState>>) {
+    let mut game_state = game_state.lock().await;
+    for _ in 0..20 {
+        let (x, y) = find_free_spot(&game_state);
+        game_state.boxes.push(WoodBox { x, y });
+    }
+}
+
+fn find_free_spot(game_state: &GameState) -> (f32, f32) {
+    let mut rng = rand::thread_rng();
+    loop {
+        let x = rng.gen_range(0..WINDOW_SIZE_X - BOX_SIZE as u32);
+        let y = rng.gen_range(0..WINDOW_SIZE_Y - BOX_SIZE as u32);
+        if is_spot_free(x as f32, y as f32, game_state) {
+            return (x as f32, y as f32);
+        }
+    }
+}
+
+fn is_spot_free(x: f32, y: f32, game_state: &GameState) -> bool {
+    let slot_size = 20.0;
+    let half_size = slot_size / 2.0;
+    let occupied = game_state.players.iter().any(|p| {
+        (p.x - x).abs() < half_size && (p.y - y).abs() < half_size
+    }) || game_state.boxes.iter().any(|b| {
+        (b.x - x).abs() < half_size && (b.y - y).abs() < half_size
+    });
+    !occupied
 }

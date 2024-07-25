@@ -3,11 +3,11 @@ extern crate sfml;
 use std::sync::Arc;
 
 use sfml::audio::Music;
-use sfml::graphics::{CircleShape, Color, Font, RenderTarget, RenderWindow, Shape, Text, Transformable};
+use sfml::graphics::{CircleShape, Color, Font, RectangleShape, RenderTarget, RenderWindow, Shape, Text, Transformable};
 use sfml::system::Vector2f;
 use sfml::window::mouse::Button;
 use sfml::window::{ContextSettings, Event, Key, Style};
-use shared::{normalize, send_command, Bullet, CMD_BULLET, CMD_PLAYER, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
+use shared::{get_distance, normalize, send_command, Bullet, CMD_BULLET, CMD_PLAYER, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
@@ -44,7 +44,8 @@ async fn main() {
         flag_x: Default::default(),
         flag_y: Default::default(),
         flag_owner_id: Default::default(),
-        bullets: vec![]
+        bullets: vec![],
+        boxes: vec![],
     }));
     let game_state_clone = Arc::clone(&game_state);
 
@@ -113,17 +114,28 @@ async fn main() {
         }
         let player_clone = player.clone(); //😐
 
+        let mut dx = 0.0;
+        let mut dy = 0.0;
         if player.y > 0.0 && Key::is_pressed(Key::W) {
-            player.y -= 5.0;
+            dy = -5.0;
+        }
+        else if player.y < WINDOW_SIZE_Y as f32 - PLAYER_RADIUS && Key::is_pressed(Key::S) {
+            dy = 5.0;
         }
         if player.x > 0.0 && Key::is_pressed(Key::A) {
-            player.x -= 5.0;
+            dx = -5.0;
         }
-        if player.y < WINDOW_SIZE_Y as f32 - PLAYER_RADIUS && Key::is_pressed(Key::S) {
-            player.y += 5.0;
+        else if player.x < WINDOW_SIZE_X as f32 - PLAYER_RADIUS && Key::is_pressed(Key::D) {
+            dx = 5.0;
         }
-        if player.x < WINDOW_SIZE_X as f32 - PLAYER_RADIUS && Key::is_pressed(Key::D) {
-            player.x += 5.0;
+        
+        player.x += dx;
+        player.y += dy;
+        for box_item in &game_state_clone.boxes {
+            if get_distance(player.x, box_item.x, player.y, box_item.y) < PLAYER_RADIUS {
+                player.x -= dx;
+                player.y -= dy;
+            }
         }
 
         send_command(&mut writer, CMD_PLAYER, &player).await;
@@ -145,6 +157,14 @@ async fn main() {
             circle.set_position(Vector2f::new(bullet.x , bullet.y));
             circle.set_fill_color(Color::MAGENTA);
             window.draw(&circle);
+        }
+        
+        for box_item in &game_state_clone.boxes {
+            let mut rect = RectangleShape::new();
+            rect.set_size(Vector2f::new(20.0, 20.0));
+            rect.set_position(Vector2f::new(box_item.x, box_item.y));
+            rect.set_fill_color(Color::YELLOW);
+            window.draw(&rect);
         }
 
         let mut flag = CircleShape::new(5.0, 30);
