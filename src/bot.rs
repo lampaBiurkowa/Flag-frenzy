@@ -74,8 +74,7 @@ impl Bot {
         }
 
         for box_item in &game_state_clone.boxes {
-            let distance = get_distance(processed_player.x, box_item.x, processed_player.y, box_item.y);
-            if distance < 50.0 {
+            if self.is_box_blocking_path(&processed_player, box_item) {
                 let (dx, dy) = normalize((box_item.x - processed_player.x, box_item.y - processed_player.y));
                 self.shoot(&processed_player, dx, dy, writer).await;
             }
@@ -121,5 +120,13 @@ impl Bot {
 
     fn can_shoot(&mut self) -> bool {
         Instant::now() - self.last_shot_time > time::Duration::from_millis(Bot::SHOOT_FREQ_MILLIS)
+    }
+
+    fn is_box_blocking_path(&self, player: &Player, box_item: &WoodBox) -> bool {
+        let bot_to_target_distance = get_distance(player.x, self.target_x, player.y, self.target_y);
+        let bot_to_box_distance = get_distance(player.x, box_item.x, player.y, box_item.y);
+        let box_to_target_distance = get_distance(box_item.x, self.target_x, box_item.y, self.target_y);
+
+        bot_to_box_distance < 50.0 && bot_to_box_distance + box_to_target_distance < bot_to_target_distance + 10.0 // Allow a small margin of error
     }
 }

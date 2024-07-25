@@ -73,14 +73,14 @@ async fn send_data(clients: Arc::<Mutex::<HashMap::<u32, OwnedWriteHalf>>>, game
             game_state_serialized = serde_json::to_string(&game_state_clone).unwrap();
 
             let bullet_count = game_state_clone.bullets.len();
-            for i in 0..bullet_count {
+            for i in (0..bullet_count).rev() { //rev for removing by index
                 game_state.bullets[i].mov();
 
                 let hit_box = game_state.boxes.iter().position(|b| get_distance(b.x, game_state_clone.bullets[i].x, b.y, game_state_clone.bullets[i].y) < BOX_SIZE);
                 if let Some(index) = hit_box {
                     let (new_x, new_y) = find_free_spot(&game_state_clone);
                     game_state.boxes[index] = WoodBox { x: new_x, y: new_y };
-                    game_state.bullets.retain(|b| b.x != game_state_clone.bullets[i].x && b.y != game_state_clone.bullets[i].y);
+                    game_state.bullets.remove(i); //won't crash because its descending :D/
                 }
             }
 
