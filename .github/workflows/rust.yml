@@ -9,6 +9,8 @@ env:
   CARGO_TERM_COLOR: always
   SFML_INCLUDE_DIR: C:/SFML/include
   SFML_LIBS_DIR: C:/SFML/lib
+  gh-version: 1.0.${GITHUB_RUN_NUMBER}
+  IMAGE_NAME: flag-frenzy-server
 jobs:
   build:
     runs-on: windows-latest
@@ -60,3 +62,21 @@ jobs:
         with:
           name: bin
           path: artifacts/client.exe
+  deploy-image:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - id: get_version
+      uses: battila7/get-version-action@v2
+    - name: Build image
+      run: docker build . --build-arg GH_USERNAME=${{secrets.GH_USERNAME}} --build-arg GH_TOKEN=${{secrets.GH_TOKEN}} --tag ${{env.IMAGE_NAME}}:latest --tag ${{env.IMAGE_NAME}}:${{env.gh-version}}
+    - name: Push image
+      run: |
+        docker login --username=${{secrets.GH_USERNAME}} --password="${{secrets.GH_TOKEN}}" ghcr.io
+        docker image tag ${{env.IMAGE_NAME}}:${{env.gh-version}} ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:${{env.gh-version}}
+        docker image tag ${{env.IMAGE_NAME}}:latest ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:latest
+        docker image push ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:${{env.gh-version}}
+        docker image push ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:latest

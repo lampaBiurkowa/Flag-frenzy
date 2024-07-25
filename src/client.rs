@@ -172,10 +172,18 @@ async fn main() {
         flag.set_fill_color(Color::BLUE);
         window.draw(&flag);
 
-        let mut player_score_text = Text::new(&format!("Your Score: {}",player_clone.score), &font, 24);
+        let mut player_score_text = Text::new(&format!("You ({}): {}",player_clone.id, player_clone.score), &font, 16);
         player_score_text.set_fill_color(Color::WHITE);
-        player_score_text.set_position((get_text_center_x(&player_score_text), WINDOW_SIZE_Y as f32 / 2.0 + 110.0));
+        player_score_text.set_position((20.0, 20.0));
         window.draw(&player_score_text);
+
+        let column_height = 20.0;
+        for (index, p) in game_state_clone.players.iter().enumerate() {
+            let mut player_score_text = Text::new(&format!("{}: {}",p.id, p.score), &font, 16);
+            player_score_text.set_fill_color(Color::WHITE);
+            player_score_text.set_position((20.0, 20.0 + (column_height * (index + 1) as f32)));
+            window.draw(&player_score_text);
+        }
 
         window.display();
     }
