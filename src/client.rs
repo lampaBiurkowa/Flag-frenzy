@@ -11,19 +11,22 @@ use sfml::window::{ContextSettings, Event, Key, Style};
 use shared::{get_distance, normalize, send_command, Bullet, CMD_BULLET, CMD_PLAYER, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use std::process::{Command as StdCommand, Child};
 
 mod shared;
 use crate::shared::GameState;
 use tokio::net::TcpStream;
 
-fn get_text_center_x(text: &Text) -> f32 {
-    (WINDOW_SIZE_X as f32 - text.global_bounds().width) / 2.0
-}
-
 enum Scene { Menu, Game }
+
+const FONT_PATH: &str = "font.ttf";
+const MUSIC_PATH: &str = "bg.ogg";
+const SERVER_CMD: &str = "./server";
+const LOCAL_ADDR: &str = "127.0.0.1:54321";
+const ADDR_FILE_PATH: &str = "addr.txt";
+const GAME_TITLE: &str = "Flag Frenzy";
 
 async fn read(mut reader: &mut Option<OwnedReadHalf>, game_state_clone: &Arc<Mutex<GameState>>) {
     let mut buffer: Vec<u8> = vec![0; 4096];
@@ -61,9 +64,9 @@ async fn main() {
     );
     window.set_vertical_sync_enabled(true);
 
-    let font = Font::from_file("font.ttf").expect("Failed to load font");
+    let font = Font::from_file(FONT_PATH).expect("Failed to load font");
 
-    let mut bg_music = Music::from_file("bg.ogg").expect("Failed to load background music");
+    let mut bg_music = Music::from_file(MUSIC_PATH).expect("Failed to load background music");
     bg_music.set_looping(true);
     bg_music.play();
 
@@ -79,6 +82,7 @@ async fn main() {
     let mut reader: Option<OwnedReadHalf>;
     let mut writer: Option<OwnedWriteHalf> = None;
     let mut player_id: u32 = 0; //hzd
+    let mut server_process: Option<Child> = None;
 
     while window.is_open() {
         window.clear(Color::BLACK);
@@ -112,8 +116,10 @@ async fn main() {
                     if let Event::KeyPressed { code, .. } = event {
                         match code {
                             Key::Num1 => {
-                                match Command::new("./server").spawn() {
-                                    Ok(_) => (),
+                                match StdCommand::new(SERVER_CMD).spawn() {
+                                    Ok(child) => {
+                                        server_process = Some(child);
+                                    },
                                     Err(e) => println!("{}", e)
                                 }
                                 sleep(Duration::from_millis(500)).await; // waitin for server to setup :D/
@@ -138,7 +144,12 @@ async fn main() {
                                 );
                                 scene = Scene::Game;
                             },
-                            Key::Num3 => std::process::exit(0),
+                            Key::Num3 => {      
+                                if let Some(mut child) = server_process.take() {
+                                    let _ = child.kill();
+                                }
+                                std::process::exit(0);  
+                            },
                             _ => ()
                         }
                     }
@@ -151,13 +162,17 @@ async fn main() {
         window.display();
     }
 
+    if let Some(mut child) = server_process {
+        let _ = child.kill();
+    }
+
     ()
 }
 
 async fn connect(player_id: &mut u32, read_addr: bool) -> (OwnedReadHalf, OwnedWriteHalf) {
-    let mut addr = String::from("127.0.0.1:54321");
+    let mut addr = String::from(LOCAL_ADDR);
     if read_addr {
-        match std::fs::read_to_string("addr.txt") {
+        match std::fs::read_to_string(ADDR_FILE_PATH) {
             Ok(x) => addr = x,
             _ => ()
         }
@@ -193,25 +208,21 @@ async fn handle_game_event(mut writer: &mut OwnedWriteHalf, game_state_clone: &G
 }
 
 fn render_menu(window: &mut RenderWindow, font: &Font) {
-    let mut title = Text::new("Flag Frenzy", font, 50);
-    title.set_fill_color(Color::WHITE);
-    title.set_position((get_text_center_x(&title), 150.0));
-    window.draw(&title);
+    draw_centered_text(GAME_TITLE, 150.0, window, font, 50);
+    draw_centered_text("1 - Play offline", 250.0, window, font, 30);
+    draw_centered_text("2 - Play online", 300.0, window, font, 30);
+    draw_centered_text("3 - Quit", 350.0, window, font, 30);
+}
 
-    let mut offline_option = Text::new("1 - Play offline", font, 30);
-    offline_option.set_fill_color(Color::WHITE);
-    offline_option.set_position((get_text_center_x(&offline_option), 250.0));
-    window.draw(&offline_option);
-
-    let mut online_option = Text::new("2 - Play online", font, 30);
-    online_option.set_fill_color(Color::WHITE);
-    online_option.set_position((get_text_center_x(&online_option), 300.0));
-    window.draw(&online_option);
-
-    let mut quit_option = Text::new("3 - Quit", font, 30);
+fn draw_centered_text(text: &str, y: f32, window: &mut RenderWindow, font: &Font, font_size: u32) {
+    let mut quit_option = Text::new(text, font, font_size);
     quit_option.set_fill_color(Color::WHITE);
-    quit_option.set_position((get_text_center_x(&quit_option), 350.0));
+    quit_option.set_position((get_text_center_x(&quit_option), y));
     window.draw(&quit_option);
+}
+
+fn get_text_center_x(text: &Text) -> f32 {
+    (WINDOW_SIZE_X as f32 - text.global_bounds().width) / 2.0
 }
 
 async fn render_game(window: &mut RenderWindow, mut writer: &mut OwnedWriteHalf, game_state_clone: &mut GameState, player_id: u32, font: &Font) {
