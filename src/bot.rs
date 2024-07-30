@@ -83,7 +83,7 @@ impl Bot {
         for p in &game_state_clone.players {
             if p.id != processed_player.id {
                 let distance = get_distance(processed_player.x, p.x, processed_player.y, p.y);
-                if distance < 200.0 {
+                if distance < 300.0 {
                     let (dx, dy) = normalize((p.x - processed_player.x, p.y - processed_player.y));
                     self.shoot(&processed_player, dx, dy, writer).await;
                 }

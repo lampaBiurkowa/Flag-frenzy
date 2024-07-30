@@ -5,6 +5,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::{self, Instant};
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 mod shared;
@@ -38,8 +39,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clients = Arc::new(Mutex::new(HashMap::<u32, OwnedWriteHalf>::new()));
     tokio::spawn(send_data(Arc::clone(&clients), Arc::clone(&game_state)));
 
-    let bot_id = player_id_counter;
-    tokio::spawn(handle_bot(bot_id, Arc::clone(&game_state)));
+    let bot_count = fs::read_to_string("bots.txt").unwrap().trim().parse::<u32>().unwrap_or(0);
+    for i in 0..bot_count {
+        let bot_id = player_id_counter + i;
+        tokio::spawn(handle_bot(bot_id, Arc::clone(&game_state)));
+    }
 
     loop {
         let (socket, _addr) = listener.accept().await?;
