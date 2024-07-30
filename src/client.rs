@@ -29,7 +29,6 @@ async fn read(mut reader: &mut Option<OwnedReadHalf>, game_state_clone: &Arc<Mut
     let mut buffer: Vec<u8> = vec![0; 4096];
     loop {
         if let Some(r) = &mut reader {
-            println!("its ok");
             match (*r).read(&mut buffer).await {
                 Ok(n) if n > 0 => {
                     let response = serde_json::from_slice::<GameState>(&buffer[..n]);
@@ -117,11 +116,8 @@ async fn main() {
                                     Ok(_) => (),
                                     Err(e) => println!("{}", e)
                                 }
-                                sleep(Duration::from_millis(500)).await;
-                                let stream = TcpStream::connect("127.0.0.1:54321").await.unwrap();
-                                let (mut r, mut w) = stream.into_split();
-                                w.write_all(b"").await.unwrap();
-                                player_id = r.read_u32().await.unwrap();
+                                sleep(Duration::from_millis(500)).await; // waitin for server to setup :D/
+                                let (r, w) = connect(&mut player_id, true).await;
                                 reader = Some(r);
                                 writer = Some(w);
                                 let game_state_clone = Arc::clone(&game_state);
@@ -132,12 +128,14 @@ async fn main() {
                                 scene = Scene::Game;
                             },
                             Key::Num2 => {
-                                let stream = TcpStream::connect("127.0.0.1:54321").await.unwrap();
-                                let (mut r, mut w) = stream.into_split();
-                                w.write_all(b"").await.unwrap();
-                                player_id = r.read_u32().await.unwrap();
+                                let (r, w) = connect(&mut player_id, true).await;
                                 reader = Some(r);
                                 writer = Some(w);
+                                let game_state_clone = Arc::clone(&game_state);
+                                tokio::spawn(async move {
+                                        read(&mut reader, &game_state_clone).await;
+                                    }
+                                );
                                 scene = Scene::Game;
                             },
                             Key::Num3 => std::process::exit(0),
@@ -154,6 +152,22 @@ async fn main() {
     }
 
     ()
+}
+
+async fn connect(player_id: &mut u32, read_addr: bool) -> (OwnedReadHalf, OwnedWriteHalf) {
+    let mut addr = String::from("127.0.0.1:54321");
+    if read_addr {
+        match std::fs::read_to_string("addr.txt") {
+            Ok(x) => addr = x,
+            _ => ()
+        }
+    }
+    let stream = TcpStream::connect(addr).await.unwrap();
+    let (mut r, mut w) = stream.into_split();
+    w.write_all(b"").await.unwrap();
+    *player_id = r.read_u32().await.unwrap();
+
+    return (r, w);
 }
 
 async fn handle_game_event(mut writer: &mut OwnedWriteHalf, game_state_clone: &GameState, player_id: u32, event: &Event) {
