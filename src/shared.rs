@@ -6,6 +6,7 @@ pub(crate) const WINDOW_SIZE_X: u32 = 800;
 pub(crate) const WINDOW_SIZE_Y: u32 = 600;
 pub(crate) const PLAYER_RADIUS: f32 = 20.0;
 pub(crate) const BOX_SIZE: f32 = 20.0;
+pub(crate) const FLAG_SIZE: f32 = 5.0;
 pub(crate) const CMD_PLAYER: &[u8] = b"PLAYER";
 pub(crate) const CMD_BULLET: &[u8] = b"BULLET";
 pub(crate) const CMD_SEPARATOR: &[u8] = b":D/";

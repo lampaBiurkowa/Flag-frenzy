@@ -1,5 +1,4 @@
 use rand::Rng;
-use shared::{get_distance, Bullet, WoodBox, BOX_SIZE, CMD_BULLET, CMD_PLAYER, CMD_SEPARATOR, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -9,8 +8,7 @@ use std::fs;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 mod shared;
-use crate::shared::GameState;
-use crate::shared::Player;
+use crate::shared::*;
 mod bot;
 use crate::bot::Bot;
 

@@ -8,7 +8,6 @@ use sfml::graphics::{CircleShape, Color, Font, RectangleShape, RenderTarget, Ren
 use sfml::system::Vector2f;
 use sfml::window::mouse::Button;
 use sfml::window::{ContextSettings, Event, Key, Style};
-use shared::{get_distance, normalize, send_command, Bullet, CMD_BULLET, CMD_PLAYER, PLAYER_RADIUS, WINDOW_SIZE_X, WINDOW_SIZE_Y};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::Mutex;
@@ -16,7 +15,7 @@ use tokio::time::sleep;
 use std::process::{Command as StdCommand, Child};
 
 mod shared;
-use crate::shared::GameState;
+use crate::shared::*;
 use tokio::net::TcpStream;
 
 enum Scene { Menu, Game }
@@ -58,14 +57,13 @@ async fn main() {
     let mut scene = Scene::Menu;
     let mut window = RenderWindow::new(
         (WINDOW_SIZE_X, WINDOW_SIZE_Y),
-        "jakis ctf",
+        GAME_TITLE,
         Style::CLOSE,
         &ContextSettings::default(),
     );
     window.set_vertical_sync_enabled(true);
 
     let font = Font::from_file(FONT_PATH).expect("Failed to load font");
-
     let mut bg_music = Music::from_file(MUSIC_PATH).expect("Failed to load background music");
     bg_music.set_looping(true);
     bg_music.play();
@@ -282,13 +280,13 @@ async fn render_game(window: &mut RenderWindow, mut writer: &mut OwnedWriteHalf,
     
     for box_item in &game_state_clone.boxes {
         let mut rect = RectangleShape::new();
-        rect.set_size(Vector2f::new(20.0, 20.0));
+        rect.set_size(Vector2f::new(BOX_SIZE, BOX_SIZE));
         rect.set_position(Vector2f::new(box_item.x, box_item.y));
         rect.set_fill_color(Color::YELLOW);
         window.draw(&rect);
     }
 
-    let mut flag = CircleShape::new(5.0, 30);
+    let mut flag = CircleShape::new(FLAG_SIZE, 30);
     flag.set_position(Vector2f::new(game_state_clone.flag_x, game_state_clone.flag_y));
     flag.set_fill_color(Color::BLUE);
     window.draw(&flag);
