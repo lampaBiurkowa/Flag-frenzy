@@ -13,5 +13,6 @@ RUN apt-get update && apt-get install -y \
     libsfml-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/server /usr/local/bin/server
+RUN echo "0" > /usr/local/bin/server/bots.txt
 
 CMD ["server"]
