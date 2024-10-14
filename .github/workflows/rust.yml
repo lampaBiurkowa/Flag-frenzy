@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download and extract SFML
         run: |
@@ -70,7 +70,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - id: get_version
-      uses: battila7/get-version-action@v2
+      uses: battila7/get-version-action@v4
     - name: Build image
       run: docker build . --build-arg GH_USERNAME=${{secrets.GH_USERNAME}} --build-arg GH_TOKEN=${{secrets.GH_TOKEN}} --tag ${{env.IMAGE_NAME}}:latest --tag ${{env.IMAGE_NAME}}:${{env.gh-version}}
     - name: Push image
