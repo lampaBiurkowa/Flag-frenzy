@@ -8,7 +8,7 @@ COPY ./Cargo.toml ./Cargo.lock ./
 COPY ./src ./src
 RUN cargo build --release
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     libsfml-dev \
     && rm -rf /var/lib/apt/lists/*
