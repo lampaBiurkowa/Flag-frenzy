@@ -1,18 +1,17 @@
-FROM rust:alpine as builder
-
-RUN apk add --no-cache \
-    musl-dev \
+FROM rust:latest AS builder
+RUN apt-get update && apt-get install -y \
     libsfml-dev \
-    build-base \
-    && rustup target add x86_64-unknown-linux-musl
-
+    && rm -rf /var/lib/apt/lists/*
 RUN USER=root cargo new --bin server
 WORKDIR /app
-
 COPY ./Cargo.toml ./Cargo.lock ./
 COPY ./src ./src
-RUN cargo build --release --target x86_64-unknown-linux-musl
-FROM alpine:latest
-RUN apk add --no-cache libsfml-dev
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/server /usr/local/bin/server
+RUN cargo build --release
+
+FROM debian:bullseye-slim
+RUN apt-get update && apt-get install -y \
+    libsfml-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/server /usr/local/bin/server
+
 CMD ["server"]
