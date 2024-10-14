@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       - name: Download and extract SFML
         run: |
@@ -58,7 +58,7 @@ jobs:
           cp target/release/client.exe artifacts/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: bin
           path: artifacts/client.exe
@@ -68,7 +68,7 @@ jobs:
       packages: write
       contents: read
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v2
     - id: get_version
       uses: battila7/get-version-action@v4
     - name: Build image
