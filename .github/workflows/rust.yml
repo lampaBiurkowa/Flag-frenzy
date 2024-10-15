@@ -12,7 +12,7 @@ env:
   gh-version: 1.0.${GITHUB_RUN_NUMBER}
   IMAGE_NAME: flag-frenzy-server
 jobs:
-  build:
+  build-client:
     runs-on: windows-latest
 
     steps:
@@ -53,15 +53,33 @@ jobs:
       - name: Package artifacts
         run: |
           mkdir artifacts
-          dir target
-          dir target/release
           cp target/release/client.exe artifacts/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bin
+          name: client-bin
           path: artifacts/client.exe
+  build-server:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Build server for Windows
+        run: |
+          cargo build --release --verbose --bin server
+
+      - name: Package server artifact
+        run: |
+          mkdir artifacts
+          cp target/release/server.exe artifacts/
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-bin
+          path: artifacts/server.exe
   deploy-image:
     runs-on: ubuntu-latest
     permissions:
