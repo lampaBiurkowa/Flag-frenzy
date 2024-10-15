@@ -54,32 +54,13 @@ jobs:
         run: |
           mkdir artifacts
           cp target/release/client.exe artifacts/
+          cp target/release/server.exe artifacts/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: client-bin
           path: artifacts/client.exe
-  build-server:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Build server for Windows
-        run: |
-          cargo build --release --verbose --bin server
-
-      - name: Package server artifact
-        run: |
-          mkdir artifacts
-          cp target/release/server.exe artifacts/
-
-      - name: Upload server artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: server-bin
-          path: artifacts/server.exe
   deploy-image:
     runs-on: ubuntu-latest
     permissions:
