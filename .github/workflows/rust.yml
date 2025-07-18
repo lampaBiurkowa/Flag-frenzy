@@ -1,87 +1,86 @@
 name: Setup SFML for rust-sfml
 
 on:
-    push:
-      branches: [ "master" ]
-    pull_request:
-      branches: [ "master" ]
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
 env:
   CARGO_TERM_COLOR: always
-  SFML_INCLUDE_DIR: C:/SFML/include
-  SFML_LIBS_DIR: C:/SFML/lib
-  gh-version: 1.0.${GITHUB_RUN_NUMBER}
+  gh-version: 1.0.${{ github.run_number }}
   IMAGE_NAME: flag-frenzy-server
+
 jobs:
   build:
     runs-on: windows-latest
+
+    strategy:
+      matrix:
+        arch: [x86_64, i686]
+        include:
+          - arch: x86_64
+            sfml_url: https://www.sfml-dev.org/files/SFML-2.5.1-windows-vc15-64-bit.zip
+            target: x86_64-pc-windows-msvc
+          - arch: i686
+            sfml_url: https://www.sfml-dev.org/files/SFML-2.5.1-windows-vc15-32-bit.zip
+            target: i686-pc-windows-msvc
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Download and extract SFML
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Download and extract SFML ${{ matrix.arch }}
         run: |
           mkdir C:/SFML
-          curl -L https://www.sfml-dev.org/files/SFML-2.5.1-windows-vc15-64-bit.zip -o sfml.zip
+          curl -L "${{ matrix.sfml_url }}" -o sfml.zip
           tar -xf sfml.zip -C C:/SFML --strip-components=1
-          rm sfml.zip
+          del sfml.zip
 
-      - name: Set up environment variables
+      - name: Set environment variables
         run: |
-          echo "SFML_INCLUDE_DIR=C:/SFML/include" >> $GITHUB_ENV
-          echo "SFML_LIBS_DIR=C:/SFML/lib" >> $GITHUB_ENV
+          echo "SFML_INCLUDE_DIR=C:/SFML/include" >> $env:GITHUB_ENV
+          echo "SFML_LIBS_DIR=C:/SFML/lib" >> $env:GITHUB_ENV
 
-      - name: Print environment variables
-        run: |
-          echo "SFML_INCLUDE_DIR is ${{ env.SFML_INCLUDE_DIR }}"
-          echo "SFML_LIBS_DIR is ${{ env.SFML_LIBS_DIR }}"
+      - name: Build ${{ matrix.arch }} Release
+        run: cargo build --release --target=${{ matrix.target }} --verbose
 
-      - name: Close and reopen cmd prompt
-        run: |
-          echo "Closing and reopening cmd prompt..."
-          cmd /c exit
-
-      - name: Verify environment variables
-        run: |
-          echo "SFML_INCLUDE_DIR is ${{ env.SFML_INCLUDE_DIR }}"
-          echo "SFML_LIBS_DIR is ${{ env.SFML_LIBS_DIR }}"
-
-      - name: Build for Windows
-        run: |
-          cargo build --release --verbose
-
-      - name: Package artifacts
+      - name: Package ${{ matrix.arch }} Artifacts
         run: |
           mkdir artifacts
-          cp target/release/client.exe artifacts/
-          cp target/release/server.exe artifacts/
+          copy target\${{ matrix.target }}\release\client.exe artifacts\client-${{ matrix.arch }}.exe
+          copy target\${{ matrix.target }}\release\server.exe artifacts\server-${{ matrix.arch }}.exe
 
-      - name: Upload artifact
+      - name: Upload ${{ matrix.arch }} client binary
         uses: actions/upload-artifact@v4
         with:
-          name: client-bin
-          path: artifacts/client.exe
-          
-      - name: Upload artifact
+          name: client-bin-${{ matrix.arch }}
+          path: artifacts/client-${{ matrix.arch }}.exe
+
+      - name: Upload ${{ matrix.arch }} server binary
         uses: actions/upload-artifact@v4
         with:
-          name: server-bin
-          path: artifacts/server.exe
+          name: server-bin-${{ matrix.arch }}
+          path: artifacts/server-${{ matrix.arch }}.exe
+
   deploy-image:
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
     steps:
-    - uses: actions/checkout@v2
-    - id: get_version
-      uses: battila7/get-version-action@v2
-    - name: Build image
-      run: docker build . --build-arg GH_USERNAME=${{secrets.GH_USERNAME}} --build-arg GH_TOKEN=${{secrets.GH_TOKEN}} --tag ${{env.IMAGE_NAME}}:latest --tag ${{env.IMAGE_NAME}}:${{env.gh-version}}
-    - name: Push image
-      run: |
-        docker login --username=${{secrets.GH_USERNAME}} --password="${{secrets.GH_TOKEN}}" ghcr.io
-        docker image tag ${{env.IMAGE_NAME}}:${{env.gh-version}} ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:${{env.gh-version}}
-        docker image tag ${{env.IMAGE_NAME}}:latest ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:latest
-        docker image push ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:${{env.gh-version}}
-        docker image push ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:latest
+      - uses: actions/checkout@v2
+      - id: get_version
+        uses: battila7/get-version-action@v2
+      - name: Build image
+        run: docker build . --build-arg GH_USERNAME=${{secrets.GH_USERNAME}} --build-arg GH_TOKEN=${{secrets.GH_TOKEN}} --tag ${{env.IMAGE_NAME}}:latest --tag ${{env.IMAGE_NAME}}:${{env.gh-version}}
+      - name: Push image
+        run: |
+          docker login --username=${{secrets.GH_USERNAME}} --password="${{secrets.GH_TOKEN}}" ghcr.io
+          docker image tag ${{env.IMAGE_NAME}}:${{env.gh-version}} ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:${{env.gh-version}}
+          docker image tag ${{env.IMAGE_NAME}}:latest ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:latest
+          docker image push ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:${{env.gh-version}}
+          docker image push ghcr.io/dibrysoft/${{env.IMAGE_NAME}}:latest
