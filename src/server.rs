@@ -14,13 +14,13 @@ use crate::bot::Bot;
 
 async fn handle_bot(bot_id: u32, game_state: Arc<Mutex<GameState>>) {
     let mut bot = Bot::new(bot_id);
-    let bot_writer = Arc::new(Mutex::new(TcpStream::connect("127.0.0.1:54321").await.unwrap().into_split().1));
+    let bot_writer = Arc::new(Mutex::new(TcpStream::connect("0.0.0.0:32571").await.unwrap().into_split().1));
     bot.run(Arc::clone(&game_state), Arc::clone(&bot_writer)).await;
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind("0.0.0.0:54321").await?;
+    let listener = TcpListener::bind("0.0.0.0:32571").await?;
     let mut player_id_counter = 1;
 
     let game_state = Arc::new(Mutex::new(GameState {
