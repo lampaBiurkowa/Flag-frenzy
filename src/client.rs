@@ -121,7 +121,7 @@ async fn main() {
                                     Err(e) => println!("{}", e)
                                 }
                                 sleep(Duration::from_millis(500)).await; // waitin for server to setup :D/
-                                let (r, w) = connect(&mut player_id, true).await;
+                                let (r, w) = connect(&mut player_id, false).await;
                                 reader = Some(r);
                                 writer = Some(w);
                                 let game_state_clone = Arc::clone(&game_state);
